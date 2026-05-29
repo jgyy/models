@@ -72,8 +72,9 @@ __pycache__/
 # ---------------------------------------------------------------------------
 # Rendered frames and preview images
 renders/
-*_preview.png
 *_night.png
+# Keep city_preview.png — it's referenced by the README
+!city_preview.png
 # Exported meshes
 exports/
 *.fbx
