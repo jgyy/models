@@ -2,51 +2,43 @@
 
 3D models built and maintained in Blender.
 
-## City landscape
+## Dungeon map
 
-A **modern-downtown** city scene for Blender 5.x: a grid of glass skyscrapers
-with a distance-based height falloff (tall core, shorter edges), green park lots,
-daytime lighting, and an aerial camera.
-
-![City preview](city_preview.png)
+A **grid-based dungeon** game map for Blender 5.x: rooms connected by corridors
+on a tile grid, fully enclosed by auto-generated stone walls, lit with a warm sun
+and atmospheric torch lights.
 
 ### What's in the scene
 
-- **Buildings** — glass towers (four tints: blue, teal, steel, warm) on a grid.
-  Footprints scale with height so the tall core reads as solid mass rather than
-  needles, and each tower is capped with a dark mechanical rooftop.
-- **Rooftop detail** — AC/utility boxes, water tanks, antenna masts, and crowning
-  spires on the tallest towers (all parented to their building).
-- **Streets** — an asphalt road grid with dashed lane markings, sidewalk slabs
-  under each block, street lamps at every intersection, and scattered parked cars.
-- **Greenery** — park lots planted with clusters of trees (trunk + conifer foliage).
-- **Environment** — a river running through the city with a bridge deck, and a
-  ring of distant hills around the skyline for depth.
-- **Time of day** — a daytime sky with a warm sun. Switch the world background and
-  sun energy down for a night scene where windows and lamps glow.
+- **Layout** — built from a 20×15 tile map (4 m tiles) where each cell is either
+  floor or void. Several rooms are linked by corridors.
+- **Floor** (`DungeonFloor`) — one tile per walkable cell, textured with the
+  PolyHaven `brick_floor_003` PBR material.
+- **Walls** (`DungeonWalls`) — generated on every edge where a floor tile borders
+  void, so the walkable space is always fully enclosed (ready for collision /
+  navmesh baking). Textured with PolyHaven `brick_wall_006`.
+- **Lighting** — a warm directional sun, a dark ambient world, and three point
+  "torch" lights placed inside rooms for atmosphere.
+- **Camera** — an overhead 3/4 view framing the whole dungeon.
 
 ### Files
 
 | File | Purpose |
 |------|---------|
-| `city.blend` | The editable scene — open in Blender to view or edit by hand |
-| `city_preview.png` | 1280×720 preview render |
-| `exports/city.glb` | glTF export for game engines / web viewers |
-| `exports/city.fbx` | FBX export for DCC tools |
+| `dungeon.blend` | The editable scene — open in Blender to view or edit by hand (textures packed) |
 
 ### Working with the scene
 
-Open `city.blend` in Blender and edit directly. The scene is organized by
-name prefix so objects are easy to select in bulk:
+Open `dungeon.blend` in Blender and edit directly. Objects are organized by name:
 
-| Prefix | Objects |
-|--------|---------|
-| `Bldg_*` | building towers (rooftop detail + windows parented underneath) |
-| `Roof_*` | rooftop AC boxes, tanks, antennas, spires |
-| `Road*` / `Paint*` | road grid and lane markings |
-| `Walk_*` / `Lamp_*` / `Pole_*` | sidewalks and street lamps |
-| `Tree_*` / `Park_*` | greenery |
-| `Hill_*` / `River` / `Bridge` | environment |
+| Object | Contents |
+|--------|----------|
+| `DungeonFloor` | floor tiles (one quad per walkable cell) |
+| `DungeonWalls` | enclosing walls (box per floor↔void edge) |
+| `Sun` | warm directional key light |
+| `Torch0` / `Torch1` / `Torch2` | point lights inside rooms |
+| `Camera` | overhead 3/4 framing camera |
 
-To re-export after edits, use **File ▸ Export ▸ glTF 2.0 / FBX** and overwrite the
-files in `exports/`.
+The layout is defined by a 2D ASCII tile map (`.` = floor, `#` = void) in the
+generation script. To reshape the dungeon, edit the map and regenerate the floor
+and wall meshes.
