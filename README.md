@@ -10,6 +10,20 @@ edges), green park lots, daytime lighting, and an aerial camera.
 
 ![City preview](city_preview.png)
 
+### What's in the scene
+
+- **Buildings** — glass towers (four tints) on a grid, slimmer footprints for the
+  tallest ones, glowing window bands, and street-level entrance canopies.
+- **Rooftop detail** — AC/utility boxes, water tanks, antenna masts, and crowning
+  spires on the tallest towers (all parented to their building).
+- **Streets** — an asphalt road grid with dashed lane markings, sidewalk slabs
+  under each block, street lamps at every intersection, and scattered parked cars.
+- **Greenery** — park lots planted with clusters of trees (trunk + conifer foliage).
+- **Environment** — a river running through the city with a bridge deck, and a
+  ring of distant hills around the skyline for depth.
+- **Time of day** — a daytime sky or a night scene where windows, lane paint, and
+  street lamps glow.
+
 ### Usage
 
 ```bash

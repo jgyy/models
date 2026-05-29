@@ -110,6 +110,47 @@ def add_box(name, center, size, material):
     return obj
 
 
+def _mesh_obj(name, bm):
+    mesh = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    bm.to_mesh(mesh)
+    bm.free()
+    return obj
+
+
+def add_cylinder(name, center, radius, depth, material, segments=12):
+    """Vertical cylinder; center is the base-center (sits on center[2])."""
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=segments,
+                          radius1=radius, radius2=radius, depth=depth)
+    obj = _mesh_obj(name, bm)
+    obj.location = (center[0], center[1], center[2] + depth / 2.0)
+    obj.data.materials.append(material)
+    return obj
+
+
+def add_cone(name, center, radius, depth, material, segments=12):
+    """Cone (tapers to a point), e.g. spires and conifer foliage."""
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=segments,
+                          radius1=radius, radius2=0.0, depth=depth)
+    obj = _mesh_obj(name, bm)
+    obj.location = (center[0], center[1], center[2] + depth / 2.0)
+    obj.data.materials.append(material)
+    return obj
+
+
+def add_sphere(name, center, radius, material, subdivisions=2):
+    """Icosphere centered on `center` (z is the sphere center, not base)."""
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=subdivisions, radius=radius)
+    obj = _mesh_obj(name, bm)
+    obj.location = center
+    obj.data.materials.append(material)
+    return obj
+
+
 def height_for(ix, iy, half):
     """Distance-from-center falloff: tall core, short edges, plus jitter."""
     cx, cy = ix - half, iy - half
@@ -145,6 +186,87 @@ def build_roads(span, night):
                     (span / (GRID * 4), 0.06, 0.01), paint_mat)
 
 
+def add_tree(name, x, y, mats, scale=1.0):
+    """Trunk cylinder + conifer-style foliage cone."""
+    trunk_h = 1.2 * scale
+    add_cylinder(f"{name}_trunk", (x, y, 0.0), 0.12 * scale, trunk_h, mats["trunk"], 6)
+    add_cone(f"{name}_leaf", (x, y, trunk_h * 0.6), 0.9 * scale, 2.6 * scale,
+             mats["leaf"], 8)
+
+
+def add_rooftop(prefix, tower, x, y, h, fp, mats):
+    """Scatter roof clutter + an occasional spire/setback; parented to tower."""
+    r = fp / 2
+    props = []
+    # 1-3 AC/utility boxes
+    for k in range(random.randint(1, 3)):
+        bx = x + random.uniform(-r * 0.5, r * 0.5)
+        by = y + random.uniform(-r * 0.5, r * 0.5)
+        bs = random.uniform(0.3, 0.7)
+        props.append(add_box(f"{prefix}_ac{k}", (bx, by, h), (bs, bs, bs * 0.8),
+                             mats["concrete"]))
+    # water tank (sometimes)
+    if random.random() < 0.5:
+        props.append(add_cylinder(f"{prefix}_tank", (x + r * 0.4, y - r * 0.4, h),
+                                  0.4, 1.0, mats["metal"], 8))
+    # tall antenna mast
+    if random.random() < 0.6:
+        props.append(add_box(f"{prefix}_ant", (x, y, h),
+                             (0.06, 0.06, random.uniform(2, 5)), mats["metal"]))
+    # crowning spire on the tallest towers
+    if h > MAX_HEIGHT * 0.6 and random.random() < 0.7:
+        props.append(add_cone(f"{prefix}_spire", (x, y, h), r * 0.4,
+                             random.uniform(4, 8), mats["metal"], 8))
+    for p in props:
+        p.parent = tower
+
+
+def add_street_props(span, night, mats):
+    """Street lamps at intersections (lit at night) and a few parked cars."""
+    half = (GRID - 1) / 2.0
+    lamp_em = ((1.0, 0.8, 0.45), 12.0) if night else ((1.0, 0.9, 0.6), 0.5)
+    lamp = make_material("LampHead", (1.0, 0.9, 0.6), emission=lamp_em)
+
+    car_colors = [(0.6, 0.05, 0.05), (0.05, 0.05, 0.07), (0.7, 0.7, 0.72),
+                  (0.05, 0.2, 0.5), (0.8, 0.8, 0.1)]
+    car_mats = [make_material(f"Car{i}", c, metallic=0.4, roughness=0.35)
+                for i, c in enumerate(car_colors)]
+
+    for ix in range(GRID + 1):
+        for iy in range(GRID + 1):
+            px = (ix - half - 0.5) * CELL
+            py = (iy - half - 0.5) * CELL
+            # lamp post: pole + glowing head
+            add_cylinder(f"Pole_{ix}_{iy}", (px, py, 0.0), 0.08, 3.0,
+                         mats["metal"], 6)
+            add_sphere(f"Lamp_{ix}_{iy}", (px, py, 3.1), 0.22, lamp, 1)
+
+    # scatter parked cars along the road strips
+    for _ in range(GRID * 4):
+        if random.random() < 0.5:  # along a vertical road
+            rx = (random.randint(0, GRID) - half - 0.5) * CELL
+            ry = random.uniform(-span / 2.2, span / 2.2)
+            size = (0.7, 1.4, 0.6)
+        else:                       # along a horizontal road
+            rx = random.uniform(-span / 2.2, span / 2.2)
+            ry = (random.randint(0, GRID) - half - 0.5) * CELL
+            size = (1.4, 0.7, 0.6)
+        add_box("Car", (rx, ry, 0.05), size, random.choice(car_mats))
+
+
+def build_environment(span, night, mats):
+    """Distant hills ringing the city + a faint ground skirt for depth."""
+    hill = mats["hill"]
+    ring = span * 0.95
+    n = 18
+    for i in range(n):
+        ang = (2 * math.pi) * i / n
+        hx = math.cos(ang) * ring
+        hy = math.sin(ang) * ring
+        rad = random.uniform(span * 0.12, span * 0.22)
+        add_cone(f"Hill_{i}", (hx, hy, -2.0), rad, random.uniform(8, 18), hill, 10)
+
+
 # ----------------------------------------------------------------------------
 # Build the city
 # ----------------------------------------------------------------------------
@@ -152,6 +274,7 @@ def build_city(night):
     random.seed(SEED)
     half = (GRID - 1) / 2.0
     span = GRID * CELL
+    river_col = 1  # this grid column becomes a river
 
     asphalt = make_material("Asphalt", (0.04, 0.04, 0.05), roughness=0.9)
     add_box("Ground", (0, 0, -0.5), (span * 0.65, span * 0.65, 0.5), asphalt)
@@ -170,22 +293,60 @@ def build_city(night):
         "Windows", (0.9, 0.85, 0.6),
         emission=((1.0, 0.9, 0.6), win_strength), roughness=0.3,
     )
-    park = make_material("Park", (0.06, 0.22, 0.07), roughness=0.8)
+
+    # shared detail materials
+    mats = {
+        "park": make_material("Park", (0.06, 0.22, 0.07), roughness=0.8),
+        "sidewalk": make_material("Sidewalk", (0.22, 0.22, 0.24), roughness=0.85),
+        "concrete": make_material("Concrete", (0.30, 0.30, 0.32), roughness=0.8),
+        "metal": make_material("Metal", (0.45, 0.47, 0.5), metallic=0.9, roughness=0.4),
+        "trunk": make_material("Trunk", (0.20, 0.12, 0.06), roughness=0.9),
+        "leaf": make_material("Leaf", (0.05, 0.25, 0.08), roughness=0.85),
+        "hill": make_material("Hill", (0.10, 0.18, 0.10), roughness=0.95),
+        "water": make_material("Water", (0.02, 0.06, 0.12), metallic=0.0,
+                               roughness=0.05),
+    }
+
+    # river running along the river_col column
+    rx = (river_col - half) * CELL
+    add_box("River", (rx, 0, 0.02), (CELL / 2 * 0.9, span / 2, 0.02), mats["water"])
 
     for ix in range(GRID):
         for iy in range(GRID):
             x = (ix - half) * CELL
             y = (iy - half) * CELL
 
+            # river column: skip buildings; place a bridge deck on the center row
+            if ix == river_col:
+                if iy == int(round(half)):
+                    add_box(f"Bridge_{iy}", (x, y, 0.4),
+                            (CELL / 2, BLOCK / 2 * 0.4, 0.2), mats["concrete"])
+                continue
+
+            # sidewalk slab under the block
+            add_box(f"Walk_{ix}_{iy}", (x, y, 0.04),
+                    (BLOCK / 2, BLOCK / 2, 0.06), mats["sidewalk"])
+
             if random.random() < EMPTY_LOT_CHANCE:
-                add_box(f"Park_{ix}_{iy}", (x, y, 0.0),
-                        (BLOCK * 0.5, BLOCK * 0.5, 0.15), park)
+                add_box(f"Park_{ix}_{iy}", (x, y, 0.05),
+                        (BLOCK * 0.5, BLOCK * 0.5, 0.12), mats["park"])
+                # a cluster of trees in the park
+                for t in range(random.randint(2, 4)):
+                    tx = x + random.uniform(-BLOCK * 0.3, BLOCK * 0.3)
+                    ty = y + random.uniform(-BLOCK * 0.3, BLOCK * 0.3)
+                    add_tree(f"Tree_{ix}_{iy}_{t}", tx, ty, mats,
+                             scale=random.uniform(0.8, 1.3))
                 continue
 
             h = height_for(ix, iy, half)
             fp = BLOCK * FOOTPRINT_MARGIN * (1.0 - 0.25 * (h / MAX_HEIGHT))
             mat = random.choice(glass_palette)
             tower = add_box(f"Bldg_{ix}_{iy}", (x, y, 0.0), (fp / 2, fp / 2, h), mat)
+
+            # entrance canopy at street level
+            canopy = add_box(f"Canopy_{ix}_{iy}", (x, y + fp / 2, 1.4),
+                             (fp / 2 * 0.7, 0.6, 0.15), mats["concrete"])
+            canopy.parent = tower
 
             # stack a few glowing window bands up the tower
             n_bands = max(2, int(h // 12))
@@ -194,6 +355,11 @@ def build_city(night):
                 band = add_box(f"Win_{ix}_{iy}_{b}", (x, y, bz - 0.3),
                                (fp / 2 * 1.01, fp / 2 * 1.01, 0.6), window)
                 band.parent = tower
+
+            add_rooftop(f"Roof_{ix}_{iy}", tower, x, y, h, fp, mats)
+
+    add_street_props(span, night, mats)
+    build_environment(span, night, mats)
 
 
 # ----------------------------------------------------------------------------
