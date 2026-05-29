@@ -53,3 +53,41 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# ---------------------------------------------------------------------------
+# Blender
+# ---------------------------------------------------------------------------
+# Auto-saved backups and version files
+*.blend1
+*.blend2
+*.blend@
+# Crash/temp data
+*.blend.tmp
+# Python caches from Blender add-ons / scripts
+__pycache__/
+*.pyc
+
+# ---------------------------------------------------------------------------
+# Generated artifacts (regenerable from city_generator.py / the .blend)
+# ---------------------------------------------------------------------------
+# Rendered frames and preview images
+renders/
+*_preview.png
+*_night.png
+# Exported meshes
+exports/
+*.fbx
+*.glb
+*.gltf
+*.obj
+*.stl
+
+# ---------------------------------------------------------------------------
+# OS / editor cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
